@@ -1,0 +1,3 @@
+ffmpeg -i burned_in.mkv -hide_banner -y -c:v copy -an -start_number 0 -hls_time 4 -hls_playlist_type vod -hls_segment_filename stream/video/source/%03d.ts -f hls stream/video/source/source.m3u8
+ffmpeg -i burned_in.mkv -hide_banner -y -c:a aac -map 0:a:0 -start_number 0 -hls_time 4 -hls_playlist_type vod -hls_segment_filename stream/audio/jp/%03d.ts -f hls stream/audio/jp/jp.m3u8
+ffmpeg -i burned_in.mkv -hide_banner -y -c:a aac -map 0:a:1 -start_number 0 -hls_time 4 -hls_playlist_type vod -hls_segment_filename stream/audio/eng/%03d.ts -f hls stream/audio/eng/eng.m3u8

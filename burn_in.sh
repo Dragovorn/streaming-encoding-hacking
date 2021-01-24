@@ -1,0 +1,1 @@
+ffmpeg -i test.mkv -hide_banner -y -filter_complex "[0:v][0:s]overlay=eof_action=pass[v]" -map "[v]" -map 0:a:0 burned_in.mkv
