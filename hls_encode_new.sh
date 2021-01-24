@@ -11,6 +11,8 @@ wait() {
 	done
 }
 
+# This is used to quickly check if the previous line ended with an error,
+# it then propogates that error up and terminates the script.
 checkerror() {
 	STATUS=$?
 
@@ -24,6 +26,8 @@ HLS_OPTIONS='-start_number 0 -hls_time 4 -hls_playlist_type vod'
 INPUT='-i ../test_2.mkv'
 FFMPEG_OPTIONS='-hide_banner -y'
 SEGMENT_FILENAME='%03d.ts'
+LIBX264='-c:v libx264 -preset ultrafast'
+PASSTHROUGH='-c:v copy'
 
 cd stream/
 
@@ -34,7 +38,7 @@ rm -vfr subtitle/eng/*
 
 # Create Video Stream
 echo "Generating video stream..."
-ffmpeg ${INPUT} ${FFMPEG_OPTIONS} -c:v libx264 -map 0:v:0 \
+ffmpeg ${INPUT} ${FFMPEG_OPTIONS} ${LIBX264} -map 0:v:0 \
  ${HLS_OPTIONS} -hls_segment_filename video/source/${SEGMENT_FILENAME} \
  -f hls video/source/source.m3u8
 
@@ -51,7 +55,7 @@ checkerror
 # Create Subtitle Stream, since ffmpeg can't create subtitle only runs,
 # also create a video stream
 echo "Generating english subtitles..."
-ffmpeg ${INPUT} ${FFMPEG_OPTIONS} -c:v copy -c:s webvtt -map 0:v:0 -map 0:s:0 \
+ffmpeg ${INPUT} ${FFMPEG_OPTIONS} ${PASSTHROUGH} -c:s webvtt -map 0:v:0 -map 0:s:0 \
  ${HLS_OPTIONS} -hls_segment_filename subtitle/eng/${SEGMENT_FILENAME} \
  -f hls subtitle/eng/eng.m3u8
 
@@ -74,7 +78,6 @@ done
 sed -e s/eng//g -i eng.m3u8
 
 echo "Done."
-
 
 #ffmpeg -i test_2.mkv -hide_banner -y -c:v copy -c:a aac -c:s webvtt -start_number 0 \
 # -hls_time 4 -hls_playlist_type vod -hls_segment_filename stream/video/source/ts-%v-%03d.ts \
