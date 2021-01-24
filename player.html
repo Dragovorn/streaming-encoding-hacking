@@ -2,42 +2,60 @@
 <html>
 	<head>
 		<title>HLS Stream Player</title>
-		<!-- <link href="https://vjs.zencdn.net/7.2.3/video-js.css" rel="stylesheet"> -->
 	</head>
 	<body>
-		<!-- <video id="player1" class="video-js vjs-default-skin" width="400" height="300" controls> -->
-			<!-- <source type="application/x-mpegURL" src="http://localhost:8000/stream2.m3u8"> -->
-		<!-- </video> -->
 		<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-		<video id="player" width="400" height="300" controls></video>
-
-
-		<!-- <script src="https://vjs.zencdn.net/ie8/ie8-version/videojs-ie8.min.js"></script> -->
-		<!-- <script src="https://vjs.zencdn.net/7.2.3/video.js"></script> -->
-		<!-- <script src="https://unpkg.com/videojs-contrib-hls.js@3.2.0/dist/videojs-contrib-hlsjs.min.js"></script> -->
-
 		<script>
-			var player = document.getElementById('player');
-			var videoSrc = 'http://localhost:8000/stream2.m3u8';
+			const queryString = window.location.search;
+			const urlParameters = new URLSearchParams(queryString);
+			const body = document.querySelector('body');
+			const form = document.createElement('form');
+			form.method = 'GET';
+			form.action = '#';
 
-			if (Hls.isSupported()) {
-				var hls = new Hls();
-				hls.loadSource(videoSrc);
-				hls.attachMedia(player);
+			if (urlParameters.has('video')) {
+				const video = document.createElement('video');
+				video.id = "player"
+				video.width = 400;
+				video.height = 300;
+				video.controls = true;
+
+				body.appendChild(video);
+
+				var player = document.querySelector('video');
+				var videoSrc = 'http://localhost:8000/' + urlParameters.get('video');
+
+				if (Hls.isSupported()) {
+					var hls = new Hls();
+					hls.loadSource(videoSrc);
+					hls.attachMedia(player);
+				}
+
+				const submit = document.createElement('input');
+				submit.type = 'submit';
+				submit.value = "Go Back";
+
+				form.appendChild(submit);
+			} else {
+				const nameInput = document.createElement('input');
+				nameInput.type = 'text';
+				nameInput.name = 'video';
+				nameInput.id = 'video';
+
+				const nameLabel = document.createElement('label');
+				nameLabel.textContent = "Stream Name: ";
+				nameLabel.for = "video";
+
+				const submit = document.createElement('input');
+				submit.type = 'submit';
+				
+				form.appendChild(nameLabel);
+				form.appendChild(nameInput);
+				form.appendChild(document.createElement('br'))
+				form.appendChild(submit);
 			}
+
+			body.appendChild(form);
 		</script>
-
-		<!-- <script> -->
-			<!-- var options = { -->
-				<!-- autoplay: true, -->
-				<!-- html5: { -->
-					<!-- hlsjsConfig: { -->
-						<!-- debug: true -->
-					<!-- } -->
-				<!-- } -->
-			<!-- }; -->
-
-			<!-- var player1 = videojs('player1', options); -->
-		<!-- </script> -->
 	</body>
 </html>
