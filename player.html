@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>HLS Stream Player</title>
+		<link href="https://vjs.zencdn.net/7.2.3/video-js.css" rel="stylesheet">
+	</head>
+	<body>
+		<video id="player1" class="video-js vjs-default-skin" width="400" height="300" controls>
+			<source type="application/x-mpegURL" src="https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8">
+		</video>
+
+		<video id="player2" class="video-js vjs-default-skin" width="400" height="300" controls>
+			<source type="application/x-mpegURL" src="http://localhost:8000/stream2.m3u8">
+		</video>
+
+		<script src="https://vjs.zencdn.net/ie8/ie8-version/videojs-ie8.min.js"></script>
+		<script src="https://vjs.zencdn.net/7.2.3/video.js"></script>
+		<script src="https://unpkg.com/videojs-contrib-hls.js@3.2.0/dist/videojs-contrib-hlsjs.min.js"></script>
+
+		<script>
+			var options = {
+				autoplay: true,
+				html5: {
+					hlsjsConfig: {
+						debug: true
+					}
+				}
+			};
+
+			var player1 = videojs('player1', options);
+
+			var player2 = videojs('player2', options);
+		</script>
+	</body>
+</html>
