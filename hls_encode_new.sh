@@ -34,7 +34,7 @@ rm -vfr subtitle/eng/*
 
 # Create Video Stream
 echo "Generating video stream..."
-ffmpeg ${INPUT} ${FFMPEG_OPTIONS} -c:v 264 -map 0:v:0 \
+ffmpeg ${INPUT} ${FFMPEG_OPTIONS} -c:v libx264 -map 0:v:0 \
  ${HLS_OPTIONS} -hls_segment_filename video/source/${SEGMENT_FILENAME} \
  -f hls video/source/source.m3u8
 

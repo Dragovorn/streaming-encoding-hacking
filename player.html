@@ -6,10 +6,6 @@
 	</head>
 	<body>
 		<video id="player1" class="video-js vjs-default-skin" width="400" height="300" controls>
-			<source type="application/x-mpegURL" src="https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8">
-		</video>
-
-		<video id="player2" class="video-js vjs-default-skin" width="400" height="300" controls>
 			<source type="application/x-mpegURL" src="http://localhost:8000/stream2.m3u8">
 		</video>
 
@@ -28,8 +24,6 @@
 			};
 
 			var player1 = videojs('player1', options);
-
-			var player2 = videojs('player2', options);
 		</script>
 	</body>
 </html>
