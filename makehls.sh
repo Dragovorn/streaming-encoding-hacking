@@ -7,7 +7,7 @@ PASSTHROUGH='-c:v copy'
 
 # This is a debug function, place this where you want to enforce a wait
 wait() {
-	echo "Press any key to continue"
+	echo "makehls: press any key to continue"
 	while [ true ] ; do
 		read -t 3 -n 1
 		if [ $? = 0 ] ; then
@@ -17,7 +17,7 @@ wait() {
 }
 
 printusage() {
-	echo "Usage: makehls.sh <input.mkv> <outfile.m3u8> <outdir>"
+	echo "makehls: makehls.sh <blueprint.sh>"
 }
 
 # This is used to quickly check if the previous line ended with an error,
@@ -26,7 +26,7 @@ checkerror() {
 	local STATUS=$?
 
 	if [ $STATUS -ne 0 ]; then
-		echo "Program errored, aborting."
+		echo "makehls: program errored, aborting."
 		exit 1
 	fi
 }
@@ -50,8 +50,22 @@ writestream() {
 	local RESOLUTION=$3
 	local AUDIO=$4
 	local SUBTITLES=$5
+	local AUDIOSTR=''
+	local SUBTITLESTR=''
 
-	echo "#EXT-X-STREAM-INF:BANDWIDTH=${BANDWIDTH},RESOLUTION=${RESOLUTION},AUDIO=\"${AUDIO}\",SUBTITLES=\"${SUBTITLES}\"" >> ${OUTFILE}
+	if [ ! -z "${AUDIO}" ]; then
+		AUDIOSTR="AUDIO=\"${AUDIO}\""
+
+		if [ ! -z "${SUBTITLES}" ]; then
+			AUDIOSTR+=','
+		fi
+	fi
+
+	if [ ! -z "${SUBTITLES}" ]; then
+		SUBTITLESTR="SUBTITLES=\"${SUBTITLES}\""
+	fi
+
+	echo "#EXT-X-STREAM-INF:BANDWIDTH=${BANDWIDTH},RESOLUTION=${RESOLUTION},${AUDIOSTR}${SUBTITLESTR}" >> ${OUTFILE}
 	echo "${RELATIVEOUTDIR}/video/${VIDEO}/${VIDEO}.m3u8" >> ${OUTFILE}
 }
 
@@ -72,22 +86,35 @@ makevideo() {
 		VIDEO=${INPUT}
 	fi
 
+
 	local MAPPEDRESOLUTION=`echo "${RESOLUTION}" | sed -r s/x+/:/g`
+	local DIR=${OUTDIR}/video/${SHORTNAME}
 
-	mkdir -p video/${SHORTNAME}
+	local RESCALE="-vf scale=${MAPPEDRESOLUTION}"
+	if [ "${ARGUMENTS}" = "-c:v copy" ]; then
+		echo "RESCALE SET"
+		RESCALE=""
+	fi
 
-	echo "Generating ${SHORTNAME} video stream..."
-	ffmpeg -i ${VIDEO} ${FFMPEG_OPTIONS} ${ARGUMENTS} -b:v ${BANDWIDTH} -maxrate ${BANDWIDTH} -bufsize $((BANDWIDTH/4)) \
-	 -vf scale=${MAPPEDRESOLUTION} -map ${MAP} ${HLS_OPTIONS} -hls_segment_filename video/${SHORTNAME}/${SEGMENT_FILENAME} \
- 	 -f hls video/${SHORTNAME}/${SHORTNAME}.m3u8
+	if [ ! -d "${DIR}" ]; then
+		mkdir -p ${DIR}
 
- 	checkerror
+		echo "makevideo: generating ${SHORTNAME} video stream..."
 
- 	echo "Writing to master playlist..."
+		ffmpeg -i ${VIDEO} ${FFMPEG_OPTIONS} ${ARGUMENTS} -b:v ${BANDWIDTH} -maxrate ${BANDWIDTH} -bufsize $((BANDWIDTH/4)) \
+	 	 ${RESCALE} -map ${MAP} ${HLS_OPTIONS} -hls_segment_filename ${DIR}/${SEGMENT_FILENAME} \
+ 	 	 -f hls ${DIR}/${SHORTNAME}.m3u8
+
+ 		checkerror
+	else
+		echo "makevideo: video stream already exists, skipping encoding..."
+	fi
+
+ 	echo "makevideo: writing to master playlist..."
 
  	writestream ${SHORTNAME} ${BANDWIDTH} ${RESOLUTION} ${AUDIO} ${SUBTITLES}
 
- 	echo "Done."
+ 	echo "makevideo: done"
 }
 
 # Example usage: makesubs 0:s:0 subtitles eng English YES
@@ -98,6 +125,7 @@ makesubs() {
 	local LONGNAME=$4
 	local DEFAULT=$5
 	local VIDEO='placeholder'
+	local DIR=${OUTDIR}/subtitles/${SHORTNAME}
 
 	if [ $# -eq 6 ]; then
 		VIDEO=$6
@@ -105,44 +133,41 @@ makesubs() {
 		VIDEO=${INPUT}
 	fi
 
-	mkdir -p subtitles/${SHORTNAME}
+	mkdir -p ${DIR}
 
 	# Create Subtitle Stream, since ffmpeg can't create subtitle only runs,
 	# also create a video stream
-	echo "Generating ${LONGNAME} subtitles..."
+	echo "makesubs: generating ${LONGNAME} subtitles..."
 	ffmpeg -i ${INPUT} ${FFMPEG_OPTIONS} ${PASSTHROUGH} -c:s webvtt -map 0:v:0 -map ${MAP} \
- 	 ${HLS_OPTIONS} -hls_segment_filename subtitles/${SHORTNAME}/${SEGMENT_FILENAME} \
- 	 -f hls subtitles/${SHORTNAME}/${SHORTNAME}.m3u8
+ 	 ${HLS_OPTIONS} -hls_segment_filename ${DIR}/${SEGMENT_FILENAME} \
+ 	 -f hls ${DIR}/${SHORTNAME}.m3u8
 
 	checkerror
-	echo "Done."
 
 	# Clean up the extra video stream that was created by ffmpeg when making sub streams
-	echo "Cleaning up ${LONGNAME} subtitles..."
-	cd subtitles/${SHORTNAME}/
-	echo "Removing video-related files"
-	rm -vfr *.ts
-	rm -vfr ${SHORTNAME}.m3u8
+	echo "makesubs: cleaning up ${LONGNAME} subtitles..."
+	echo "makesubs: removing video-related files"
+	rm -vfr ${DIR}/*.ts
+	rm -vfr ${DIR}/${SHORTNAME}.m3u8
 	# Take care to ensure we have our original file names present.
-	echo "Overwrite to expected subtitle playlist"
-	mv ${SHORTNAME}_vtt.m3u8 ${SHORTNAME}.m3u8
+	echo "makesubs: overwrite to expected subtitle playlist"
+	mv ${DIR}/${SHORTNAME}_vtt.m3u8 ${DIR}/${SHORTNAME}.m3u8
 
 	# Rename all vtt files to their original intended names
-	echo "Rename part files for consistency"
-	for f in *.vtt; do
-    	mv "$f" "${f#*${SHORTNAME}}"
+	echo "makesubs: rename part files for consistency"
+	for f in ${DIR}/*.vtt; do
+    	BASE=`basename $f`
+    	mv "$f" "${DIR}/${BASE#${SHORTNAME}}"
 	done
 
 	# Rename all occurances within the playlist file too
-	echo "Repair playlist file"
-	sed -e s/${SHORTNAME}//g -i ${SHORTNAME}.m3u8
+	echo "makesubs: repair playlist file"
+	sed -e s/${SHORTNAME}//g -i ${DIR}/${SHORTNAME}.m3u8
 
-	echo "Writing to master playlist..."
+	echo "makesubs: writing to master playlist..."
 	writemedia SUBTITLES ${GROUPNAME} ${SHORTNAME} ${LONGNAME} ${DEFAULT} YES
 
-	echo "Done."
-
-	cd ../../
+	echo "make subs: done"
 }
 
 # Example usage: makeaudio 0:a:0 audio eng English YES
@@ -153,6 +178,7 @@ makeaudio() {
 	local LONGNAME=$4
 	local DEFAULT=$5
 	local VIDEO='placeholder'
+	local DIR=${OUTDIR}/audio/${SHORTNAME}
 
 	if [ $# -eq 6 ]; then
 		VIDEO=$6
@@ -160,66 +186,96 @@ makeaudio() {
 		VIDEO=${INPUT}
 	fi
 
-	mkdir -p audio/${SHORTNAME}
+	mkdir -p ${DIR}
 
 	# Create Audio Stream
-	echo "Generating ${LONGNAME} audio stream..."
+	echo "makeaudio: generating ${LONGNAME} audio stream..."
 	ffmpeg -i ${INPUT} ${FFMPEG_OPTIONS} -c:a aac -map ${MAP} \
- 	 ${HLS_OPTIONS} -hls_segment_filename audio/jp/${SEGMENT_FILENAME} \
- 	 -f hls audio/jp/jp.m3u8
+ 	 ${HLS_OPTIONS} -hls_segment_filename ${DIR}/${SEGMENT_FILENAME} \
+ 	 -f hls ${DIR}/${SHORTNAME}.m3u8
 
  	checkerror
 
- 	echo "Writing to master playlist..."
+ 	echo "makeaudio: writing to master playlist..."
 
  	writemedia AUDIO ${GROUPNAME} ${SHORTNAME} ${LONGNAME} ${DEFAULT} NO
 
- 	echo "Done."
+ 	echo "makeaudio: done"
 }
 
-if [ $# -ne 3 ]; then
+# Example usage: burnin 0:v:0 0:s:0 burned_in
+burnin() {
+	local VIDEOMAP=$1
+	local SUBMAP=$2
+	local NAME=$3
+	local DIR=${OUTDIR}/work/
+
+	ffmpeg -i ${INPUT} ${FFMPEG_OPTIONS} -filter_complex "[${VIDEOMAP}][${SUBMAP}]overlay=eof_action=pass[v]" \
+	 -map "[v]" ${DIR}/${NAME}.mkv
+
+	echo "${DIR}/${NAME}.mkv"
+}
+
+setout() {
+	if [ $# -ne 1 ]; then
+		echo "setout: one argument is required for this function: outname"
+		exit 1
+	fi
+
+	OUTDIR=$1
+	RELATIVEOUTDIR=${OUTDIR}
+	OUTDIR=`realpath ${OUTDIR}`
+	OUTFILE=${OUTDIR}
+	OUTFILE+='.m3u8'
+
+	echo "setout: removing previous outfile..."
+	rm -vfr ${OUTFILE}
+
+	touch ${OUTFILE}
+
+	echo "setout: creating outdir: ${OUTDIR}..."
+	mkdir -p ${OUTDIR}
+
+	echo "setout: appending hls metadata tags..."
+	echo "#EXTM3U" >> ${OUTFILE}
+
+	echo "setout: formatting outdir..."
+	mkdir -p ${OUTDIR}/video/
+	mkdir -p ${OUTDIR}/audio/
+	mkdir -p ${OUTDIR}/subtitles/
+	mkdir -p ${OUTDIR}/work/
+
+	echo "setout: cleaning outdir..."
+	rm -vfr ${OUTDIR}/video/*
+	rm -vfr ${OUTDIR}/audio/*
+	rm -vfr ${OUTDIR}/subtitles/*
+	rm -vfr ${OUTDIR}/work/*
+}
+
+setin() {
+	if [ $# -ne 1 ]; then
+		echo "setin: one argument is required for this function: infile"
+		exit 1
+	fi
+
+	INPUT=`realpath $1`
+
+	echo "setin: input set to: ${INPUT}"
+}
+
+if [ $# -eq 0 ]; then
 	printusage
 	exit 1
 fi
 
-INPUT=$1
-OUTFILE=$2
-OUTDIR=$3
-RELATIVEOUTDIR=${OUTDIR}
+echo "makehls: processing $# blueprint file..."
 
-rm -fr ${OUTFILE}
+BLUEPRINTS=$@
 
-touch ${OUTFILE}
+for BLUEPRINT in ${BLUEPRINTS}
+do
+	echo "makehls: executing blueprint: ${BLUEPRINT}"
+	source ${BLUEPRINT}
+done
 
-OUTFILE=`realpath ${OUTFILE}`
-
-mkdir -p ${OUTDIR}
-
-OUTDIR=`realpath ${OUTDIR}`
-
-echo "#EXTM3U" >> ${OUTFILE}
-echo "Write #EXTM3U to ${OUTFILE}"
-
-# If new dir setup dir-structure
-mkdir -p ${OUTDIR}/video/
-mkdir -p ${OUTDIR}/audio/
-mkdir -p ${OUTDIR}/subtitles/
-
-INPUT=`realpath ${INPUT}`
-
-cd ${OUTDIR}/
-
-# Clean up old attempts
-rm -vfr video/*
-rm -vfr audio/*
-rm -vfr subtitles/*
-
-makeaudio 0:a:0 audio jp Japanese YES
-
-makesubs 0:s:0 subtitles eng English YES
-makesubs 0:s:2 subtitles spa Spanish NO
-makesubs 0:s:5 subtitles ara Arabic NO
-
-makevideo 0:v:0 source 5605600 '1920x1080' 'audio' 'subtitles' '-c:v libx264 -preset ultrafast'
-
-echo "Done writing stream."
+echo "makehls: done executing"
